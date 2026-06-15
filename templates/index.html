@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Media Collection</title>
+<style>
+  :root {
+    --bg: #0d0f14; --surface: #161a24; --surface2: #1e2434; --border: #2a3050;
+    --accent: #4f8ef7; --accent2: #7c5fe6; --gold: #f5c842; --text: #e0e4f0;
+    --muted: #7a84a0; --success: #3ecf8e; --danger: #f7634f; --lety: #e91e8c;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; min-height: 100vh; }
+
+  header { background: linear-gradient(135deg,#0a0c12,#111627); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; position: sticky; top: 0; z-index: 200; box-shadow: 0 4px 20px rgba(0,0,0,.5); }
+  header h1 { font-size: 1.3rem; font-weight: 700; background: linear-gradient(90deg,var(--accent),var(--accent2)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; white-space: nowrap; }
+  #header-search { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 220px; max-width: 540px; margin-left: auto; }
+  #search-cat { background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 10px; border-radius: 6px; font-size: .82rem; cursor: pointer; outline: none; flex-shrink: 0; }
+  #search-cat:focus { border-color: var(--accent); }
+  .search-text-wrap { position: relative; flex: 1; }
+  #search-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 32px 7px 12px; border-radius: 6px; font-size: .9rem; outline: none; }
+  #search-input:focus { border-color: var(--accent); }
+  #search-clear { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); background: none; border: none; color: var(--muted); cursor: pointer; font-size: .95rem; padding: 0; display: none; }
+  #search-clear:hover { color: var(--danger); }
+
+  /* ── Search results panel ── */
+  #search-results-panel { display: none; flex: 1; overflow-y: auto; padding: 20px 28px; }
+  #search-results-panel.active { display: block; }
+  .sr-section { margin-bottom: 28px; }
+  .sr-section-title { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; margin-bottom: 10px; padding-bottom: 6px; border-bottom: 1px solid var(--border); }
+  .sr-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 7px; transition: background .12s; }
+  .sr-item:hover { background: var(--surface); }
+  .sr-icon { font-size: 1.1rem; flex-shrink: 0; }
+  .sr-name { flex: 1; font-size: .88rem; color: var(--text); overflow: hidden; }
+  .sr-name strong { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sr-name small { color: var(--muted); font-size: .78rem; }
+  .sr-empty { color: var(--muted); font-size: .9rem; text-align: center; padding: 40px 0; }
+  .sr-count { color: var(--muted); font-size: .8rem; margin-bottom: 16px; }
+
+  /* ── Player bar ── */
+  #player-bar { background: var(--surface); border-bottom: 2px solid var(--accent); padding: 8px 20px; display: none; align-items: center; gap: 14px; position: sticky; top: 57px; z-index: 150; box-shadow: 0 4px 16px rgba(0,0,0,.4); }
+  #player-bar.active { display: flex; }
+  #player-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); white-space: nowrap; }
+  #player-title { font-size: .88rem; color: var(--accent); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 0 1 280px; }
+  #player-progress { font-size: .75rem; color: var(--muted); white-space: nowrap; }
+  #player-bar audio { flex: 1; min-width: 200px; height: 36px; }
+  #close-player { background: none; border: none; color: var(--muted); cursor: pointer; font-size: 1.1rem; padding: 4px 8px; flex-shrink: 0; }
+  #close-player:hover { color: var(--danger); }
+
+  /* ── Tabs ── */
+  .tabs { display: flex; border-bottom: 1px solid var(--border); padding: 0 24px; background: var(--surface); position: sticky; top: 57px; z-index: 140; }
+  .tab-btn { background: none; border: none; color: var(--muted); padding: 14px 24px; cursor: pointer; font-size: .95rem; font-weight: 500; border-bottom: 3px solid transparent; transition: all .2s; display: flex; align-items: center; gap: 7px; white-space: nowrap; }
+  .tab-btn:hover { color: var(--text); }
+  .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  /* ── Layout ── */
+  .tab-panel { display: none; }
+  .tab-panel.active { display: flex; height: calc(100vh - 114px); }
+  .sidebar { width: 270px; min-width: 200px; background: var(--surface); border-right: 1px solid var(--border); overflow-y: auto; flex-shrink: 0; display: flex; flex-direction: column; }
+  .main-panel { flex: 1; overflow-y: auto; padding: 22px 28px; }
+
+  /* ── Sidebar ── */
+  .search-wrap { padding: 10px 10px 6px; flex-shrink: 0; }
+  .search-wrap input { width: 100%; background: var(--surface2); border: 1px solid var(--border); color: var(--text); padding: 7px 11px; border-radius: 6px; font-size: .85rem; outline: none; }
+  .search-wrap input:focus { border-color: var(--accent); }
+  .sidebar-scroller { overflow-y: auto; flex: 1; }
+  .sidebar-section { padding: 10px 14px 3px; font-size: .68rem; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); font-weight: 700; }
+  .sidebar-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: none; border: none; color: var(--text); padding: 8px 18px; cursor: pointer; font-size: .875rem; transition: background .12s; }
+  .sidebar-item:hover { background: var(--surface2); color: var(--accent); }
+  .sidebar-item.active { background: rgba(79,142,247,.12); color: var(--accent); border-left: 3px solid var(--accent); padding-left: 15px; }
+  .sidebar-item .badge { margin-left: auto; font-size: .65rem; background: var(--surface2); color: var(--muted); padding: 2px 6px; border-radius: 10px; flex-shrink: 0; }
+
+  /* ── Main panel ── */
+  .section-title { font-size: 1.2rem; font-weight: 700; margin-bottom: 6px; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .section-sub { font-size: .82rem; color: var(--muted); margin-bottom: 18px; }
+  .album-block { margin-bottom: 24px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .album-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--surface2); border-bottom: 1px solid var(--border); }
+  .album-name { font-size: .95rem; font-weight: 600; color: var(--gold); flex: 1; }
+  .track-row { display: flex; align-items: center; gap: 8px; padding: 7px 14px; transition: background .12s; }
+  .track-row:hover { background: var(--surface2); }
+  .track-name { flex: 1; font-size: .85rem; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .track-num { font-size: .75rem; color: var(--muted); width: 22px; text-align: right; flex-shrink: 0; }
+
+  /* ── Buttons ── */
+  .btn { border: none; border-radius: 5px; padding: 4px 11px; font-size: .78rem; cursor: pointer; font-weight: 600; transition: opacity .15s, background .15s; white-space: nowrap; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
+  .btn:hover { opacity: .82; }
+  .btn-play  { background: var(--accent); color: #fff; }
+  .btn-all   { background: var(--accent2); color: #fff; }
+  .btn-dl    { background: var(--surface2); color: var(--muted); border: 1px solid var(--border); }
+  .btn-dl:hover { color: var(--success); border-color: var(--success); }
+  .btn-zip   { background: transparent; color: var(--gold); border: 1px solid var(--gold); }
+  .btn-zip:hover { background: rgba(245,200,66,.1); }
+
+  /* ── Movies ── */
+  .movies-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px,1fr)); gap: 14px; }
+  .movie-card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px; transition: border-color .2s, transform .15s; }
+  .movie-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+  .movie-card h3 { font-size: .875rem; font-weight: 600; margin-bottom: 12px; line-height: 1.4; }
+  .movie-card .actions { display: flex; gap: 7px; flex-wrap: wrap; }
+
+  /* ── Lety ── */
+  .lety-badge { background: linear-gradient(135deg,#8a2be2,var(--lety)); color:#fff; font-size:.68rem; font-weight:700; padding:2px 8px; border-radius:20px; margin-left:6px; }
+
+  /* ── Books breadcrumb ── */
+  .breadcrumb { font-size: .8rem; color: var(--muted); margin-bottom: 14px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .breadcrumb .crumb { color: var(--accent); cursor: pointer; }
+  .breadcrumb .crumb:hover { text-decoration: underline; }
+
+  /* ── Now playing highlight ── */
+  .track-row.now-playing { background: rgba(79,142,247,.13); border-left: 3px solid var(--accent); padding-left: 11px; }
+  .track-row.now-playing .track-name { color: var(--accent); font-weight: 600; }
+  .track-row.now-playing .track-num { color: var(--accent); }
+
+  /* ── Video modal ── */
+  #video-modal { display: none; position: fixed; inset: 0; z-index: 900; background: #000; }
+  #video-modal.open { display: block; }
+  #modal-video { width: 100%; height: 100vh; display: block; object-fit: contain; }
+  #video-modal-header { position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+    display: flex; align-items: center; gap: 14px; padding: 18px 22px;
+    background: linear-gradient(to bottom, rgba(0,0,0,.75) 0%, transparent 100%);
+    transition: opacity .4s; }
+  #video-modal-header.hidden { opacity: 0; pointer-events: none; }
+  #video-modal-title { flex: 1; font-size: 1.1rem; font-weight: 600; color: #fff;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-shadow: 0 1px 6px rgba(0,0,0,.8); }
+  #video-modal-close { background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.2);
+    color: #fff; width: 38px; height: 38px; border-radius: 50%; cursor: pointer;
+    font-size: 1.1rem; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    transition: background .15s; }
+  #video-modal-close:hover { background: var(--danger); border-color: var(--danger); }
+
+  /* ── Misc ── */
+  .loading { text-align: center; color: var(--muted); padding: 50px 0; }
+  .empty   { text-align: center; color: var(--muted); padding: 36px 0; font-size: .9rem; }
+  .full-width { width: 100%; }
+  ::-webkit-scrollbar { width: 5px; } ::-webkit-scrollbar-track { background: var(--surface); } ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  /* ── Mobile back button (hidden on desktop) ── */
+  .mob-back { display: none; }
+
+  /* ── Mobile responsive ── */
+  @media (max-width: 700px) {
+    /* Tabs: compact */
+    /* Search bar: full width below title on mobile */
+    #header-search { max-width: 100%; width: 100%; margin-left: 0; }
+    #search-cat { font-size: .78rem; padding: 6px 8px; }
+
+    .tabs { padding: 0 4px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab-btn { padding: 10px 12px; font-size: .78rem; gap: 4px; }
+
+    /* Stack sidebar on top of main panel */
+    .tab-panel.active { flex-direction: column; height: auto; min-height: calc(100dvh - 100px); overflow-y: auto; }
+    .sidebar { width: 100%; min-width: unset; max-height: 46vh; border-right: none; border-bottom: 1px solid var(--border); overflow-y: auto; }
+    .sidebar.mob-gone { display: none; }
+    .main-panel { padding: 14px 12px; }
+
+    /* Touch-friendly targets */
+    .btn { padding: 8px 14px; font-size: .85rem; }
+    .sidebar-item { padding: 12px 16px; font-size: .92rem; }
+    .track-row { padding: 11px 10px; gap: 8px; }
+    .track-num { width: 18px; }
+
+    /* Movies: 2-col on phones, more on tablets */
+    .movies-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
+    .movie-card { padding: 12px; }
+    .movie-card .actions { flex-direction: column; gap: 6px; }
+    .movie-card .actions .btn { text-align: center; justify-content: center; }
+
+    /* Album headers: wrap so buttons go below name */
+    .album-header { flex-wrap: wrap; row-gap: 6px; }
+    .album-name { width: 100%; margin-bottom: 2px; }
+
+    /* Section title: smaller + wrap */
+    .section-title { font-size: 1rem; flex-wrap: wrap; }
+
+    /* Mobile back button */
+    .mob-back { display: flex; align-items: center; gap: 8px; margin-bottom: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
+    .mob-back button { background: var(--surface2); border: 1px solid var(--border); color: var(--accent); padding: 8px 16px; border-radius: 6px; font-size: .9rem; cursor: pointer; font-weight: 600; }
+    .mob-back button:active { opacity: .7; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <span style="font-size:1.6rem">🎬</span>
+  <h1>Media Collection</h1>
+  <div id="header-search">
+    <select id="search-cat">
+      <option value="books">📚 Audiobooks</option>
+      <option value="lety">💜 Lety's</option>
+      <option value="music">🎵 Music</option>
+      <option value="movies">🎬 Movies</option>
+      <option value="all">🔍 All</option>
+    </select>
+    <div class="search-text-wrap">
+      <input type="search" id="search-input" placeholder="Search…" autocomplete="off">
+      <button id="search-clear">✕</button>
+    </div>
+  </div>
+</header>
+
+<!-- ── Video modal ── -->
+<div id="video-modal">
+  <div id="video-modal-header">
+    <span id="video-modal-title"></span>
+    <button id="video-modal-close" title="Close (Esc)">✕</button>
+  </div>
+  <video id="modal-video" controls preload="none"></video>
+</div>
+
+<!-- ── Persistent audio player bar ── -->
+<div id="player-bar">
+  <span id="player-label">NOW PLAYING</span>
+  <span id="player-title">—</span>
+  <span id="player-progress"></span>
+  <audio id="audio-player" controls preload="none"></audio>
+  <button id="close-player" title="Close">✕</button>
+</div>
+
+<!-- ── Tabs ── -->
+<div class="tabs">
+  <button class="tab-btn active" data-tab="books">📚 Audiobooks</button>
+  <button class="tab-btn" data-tab="lety">💜 Lety's Collection</button>
+  <button class="tab-btn" data-tab="music">🎵 Music</button>
+  <button class="tab-btn" data-tab="movies">🎬 Movies</button>
+</div>
+
+<!-- ══ SEARCH RESULTS ═══════════════════════════════════════════════════ -->
+<div id="search-results-panel"></div>
+
+<!-- ══ MOVIES ══════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-movies">
+  <div class="main-panel full-width">
+    <div class="section-title">Movies <span id="movie-count" style="font-size:.8rem;color:var(--muted);font-weight:400;"></span></div>
+    <div style="max-width:340px; margin-bottom:16px;">
+      <div class="search-wrap" style="padding:0;"><input type="text" id="movie-search" placeholder="Search movies…"></div>
+    </div>
+    <div class="movies-grid" id="movies-grid"><div class="loading">Loading…</div></div>
+  </div>
+</div>
+
+<!-- ══ MUSIC ════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-music">
+  <div class="sidebar">
+    <div class="search-wrap"><input type="text" id="music-search" placeholder="Search artists…"></div>
+    <div class="sidebar-scroller" id="artist-list"></div>
+  </div>
+  <div class="main-panel" id="music-main">
+    <div class="empty">Select an artist from the sidebar.</div>
+  </div>
+</div>
+
+<!-- ══ LETY ═════════════════════════════════════════════════════════════ -->
+<div class="tab-panel" id="tab-lety">
+  <div class="main-panel full-width" id="lety-main">
+    <div class="loading">Loading…</div>
+  </div>
+</div>
+
+<!-- ══ AUDIOBOOKS ════════════════════════════════════════════════════════ -->
+<div class="tab-panel active" id="tab-books">
+  <div class="sidebar">
+    <div class="search-wrap"><input type="text" id="books-search" placeholder="Search…"></div>
+    <div class="sidebar-scroller" id="books-nav"></div>
+  </div>
+  <div class="main-panel" id="books-main">
+    <div class="empty">Select a category from the sidebar.</div>
+  </div>
+</div>
+
+<script>
+/* ── Helpers ─────────────────────────────────────────────────────────── */
+const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+const enc = s => encodeURIComponent(String(s));
+const api = url => fetch(url).then(r => { if (!r.ok) throw r; return r.json(); });
+
+// Encode a path that may contain slashes — encode each segment separately
+const encPath = p => p.split('/').map(enc).join('/');
+
+/* ── Track registry (avoids JSON-in-onclick quoting bugs) ─────────────── */
+const _reg = {};
+let _regN = 0;
+function storeTracklist(tracks) {
+  const id = _regN++;
+  _reg[id] = tracks;
+  return id;
+}
+
+/* ── Now-playing state ────────────────────────────────────────────────── */
+let nowPlayingUrl = null;
+
+function setNowPlaying(url) {
+  nowPlayingUrl = url;
+  document.querySelectorAll('.track-row').forEach(row =>
+    row.classList.toggle('now-playing', !!url && row.dataset.url === url)
+  );
+}
+
+// Re-apply highlight after any innerHTML swap (tabs stay in DOM so this covers switching back)
+function applyHighlight() { setNowPlaying(nowPlayingUrl); }
+
+/* ── Mobile nav helpers ───────────────────────────────────────────────── */
+const MOBILE_BACK = `<div class="mob-back"><button onclick="mobileBack(this)">← Back</button></div>`;
+
+function isMobile() { return window.innerWidth <= 700; }
+
+function mobileEnterContent(mainEl) {
+  if (!isMobile()) return;
+  mainEl.closest('.tab-panel')?.querySelector('.sidebar')?.classList.add('mob-gone');
+  mainEl.scrollTop = 0;
+}
+
+function mobileBack(btn) {
+  const panel = btn.closest('.tab-panel');
+  panel.querySelector('.sidebar')?.classList.remove('mob-gone');
+  panel.querySelector('.sidebar')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ── Tab switching ────────────────────────────────────────────────────── */
+const tabBtns   = document.querySelectorAll('.tab-btn');
+const tabPanels = document.querySelectorAll('.tab-panel');
+tabBtns.forEach(btn => btn.addEventListener('click', () => {
+  tabBtns.forEach(b => b.classList.remove('active'));
+  tabPanels.forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+  if (btn.dataset.tab === 'music'  && !musicLoaded)  loadArtists();
+  if (btn.dataset.tab === 'lety'   && !letyLoaded)   loadLety();
+  if (btn.dataset.tab === 'books'  && !booksLoaded)  loadBookCategories();
+  if (btn.dataset.tab === 'movies' && !moviesLoaded) loadMovies();
+  applyHighlight();
+}));
+
+/* ── Video modal ─────────────────────────────────────────────────────── */
+const videoModal       = document.getElementById('video-modal');
+const modalVideo       = document.getElementById('modal-video');
+const videoModalTitle  = document.getElementById('video-modal-title');
+const videoModalHeader = document.getElementById('video-modal-header');
+let _hideHeaderTimer;
+
+function _resetHeaderTimer() {
+  videoModalHeader.classList.remove('hidden');
+  clearTimeout(_hideHeaderTimer);
+  _hideHeaderTimer = setTimeout(() => videoModalHeader.classList.add('hidden'), 3000);
+}
+
+videoModal.addEventListener('mousemove', _resetHeaderTimer);
+videoModal.addEventListener('click', _resetHeaderTimer);
+
+function openVideoModal(url, title) {
+  videoModalTitle.textContent = title;
+  modalVideo.src = url;
+  videoModal.classList.add('open');
+  document.body.style.overflow = 'hidden';
+  modalVideo.play();
+  _resetHeaderTimer();
+}
+
+function closeVideoModal() {
+  modalVideo.pause();
+  modalVideo.src = '';
+  videoModal.classList.remove('open');
+  document.body.style.overflow = '';
+  clearTimeout(_hideHeaderTimer);
+}
+
+document.getElementById('video-modal-close').addEventListener('click', closeVideoModal);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeVideoModal(); });
+
+/* ── Audio player bar ────────────────────────────────────────────────── */
+let playlist = [], playIdx = 0;
+const playerBar   = document.getElementById('player-bar');
+const audioPlayer = document.getElementById('audio-player');
+const playerTitle = document.getElementById('player-title');
+const playerProg  = document.getElementById('player-progress');
+
+document.getElementById('close-player').addEventListener('click', () => {
+  audioPlayer.pause();
+  playerBar.classList.remove('active');
+  playlist = []; playIdx = 0;
+  setNowPlaying(null);
+});
+
+audioPlayer.addEventListener('ended', () => {
+  if (playIdx + 1 < playlist.length) { playIdx++; playTrack(); }
+  else setNowPlaying(null);
+});
+
+function playTrack() {
+  const t = playlist[playIdx];
+  playerTitle.textContent = t.title;
+  playerProg.textContent  = playlist.length > 1 ? `${playIdx + 1} / ${playlist.length}` : '';
+  audioPlayer.src = t.url;
+  audioPlayer.play();
+  playerBar.classList.add('active');
+  setNowPlaying(t.url);
+}
+
+function playMedia(url, title, isVideo) {
+  if (isVideo) {
+    openVideoModal(url, title);
+  } else {
+    playlist = [{ url, title }]; playIdx = 0; playTrack();
+  }
+}
+
+// Called from onclick via registry id — avoids quoting issues with apostrophes in titles
+function playAllById(id) {
+  playlist = _reg[id]; playIdx = 0; playTrack();
+}
+
+/* ══ MOVIES ══════════════════════════════════════════════════════════════ */
+let allMovies = [];
+async function loadMovies() {
+  moviesLoaded = true;
+  try {
+    allMovies = await api('/api/movies');
+    document.getElementById('movie-count').textContent = `(${allMovies.length} films)`;
+    renderMovies(allMovies);
+  } catch(e) {
+    document.getElementById('movies-grid').innerHTML = '<div class="empty">Failed to load movies.</div>';
+  }
+}
+
+function renderMovies(movies) {
+  const grid = document.getElementById('movies-grid');
+  if (!movies.length) { grid.innerHTML = '<div class="empty">No results.</div>'; return; }
+  grid.innerHTML = movies.map(m => `
+    <div class="movie-card">
+      <h3>${esc(m.title)}</h3>
+      <div class="actions">
+        <button class="btn btn-play" onclick="playMedia('/stream/movie/${enc(m.filename)}','${esc(m.title)}',true)">▶ Play</button>
+        <a class="btn btn-dl" href="/download/movie/${enc(m.filename)}" download>⬇ Save</a>
+      </div>
+    </div>`).join('');
+}
+
+document.getElementById('movie-search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  renderMovies(q ? allMovies.filter(m => m.title.toLowerCase().includes(q)) : allMovies);
+});
+
+/* ══ MUSIC ══════════════════════════════════════════════════════════════ */
+let moviesLoaded = false;
+let musicLoaded = false;
+
+async function loadArtists() {
+  musicLoaded = true;
+  const list = document.getElementById('artist-list');
+  list.innerHTML = '<div class="loading" style="padding:20px">Loading…</div>';
+  try {
+    const artists = await api('/api/music/artists');
+    list.innerHTML = `<div class="sidebar-section">Artists (${artists.length})</div>` +
+      artists.map(a => `<button class="sidebar-item" onclick="loadAlbums(this,'${esc(a)}')">${esc(a)}</button>`).join('');
+  } catch(e) { list.innerHTML = '<div class="empty">Error loading artists.</div>'; }
+}
+
+document.getElementById('music-search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#artist-list .sidebar-item').forEach(b =>
+    b.style.display = b.textContent.toLowerCase().includes(q) ? '' : 'none'
+  );
+});
+
+async function loadAlbums(btn, artist) {
+  document.querySelectorAll('#artist-list .sidebar-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const main = document.getElementById('music-main');
+  main.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const albums = await api(`/api/music/artist/${enc(artist)}`);
+    let html = MOBILE_BACK + `<div class="section-title">🎤 ${esc(artist)}
+      <a class="btn btn-zip" href="/download/zip/music/artist/${enc(artist)}" download>⬇ Download Artist</a>
+    </div>`;
+    albums.forEach(alb => {
+      const albumTracks = alb.tracks.map(t => ({
+        url:   `/stream/music/${enc(artist)}/${enc(alb.album)}/${enc(t)}`,
+        title: `${alb.album ? alb.album + ' – ' : ''}${t}`,
+      }));
+      const rid = storeTracklist(albumTracks);
+      html += `<div class="album-block"><div class="album-header">
+        <span class="album-name">💿 ${alb.album ? esc(alb.album) : '<em style="color:var(--muted)">Singles</em>'}</span>`;
+      if (alb.album) {
+        html += `<button class="btn btn-all" onclick="playAllById(${rid})">▶ Play All</button>
+          <a class="btn btn-zip" href="/download/zip/music/album/${enc(artist)}/${enc(alb.album)}" download>⬇ Album</a>`;
+      }
+      html += `</div>`;
+      alb.tracks.forEach((t, i) => {
+        const url = `/stream/music/${enc(artist)}/${enc(alb.album)}/${enc(t)}`;
+        const dl  = `/download/music/${enc(artist)}/${enc(alb.album)}/${enc(t)}`;
+        html += `<div class="track-row" data-url="${url}">
+          <span class="track-num">${i + 1}</span>
+          <span class="track-name">🎵 ${esc(t)}</span>
+          <button class="btn btn-play" onclick="playMedia('${url}','${esc(t)}',false)">▶</button>
+          <a class="btn btn-dl" href="${dl}" download>⬇</a>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    main.innerHTML = html;
+    mobileEnterContent(main);
+    applyHighlight();
+  } catch(e) { main.innerHTML = '<div class="empty">Failed to load albums.</div>'; }
+}
+
+/* ══ LETY ════════════════════════════════════════════════════════════════ */
+let letyLoaded = false;
+async function loadLety() {
+  letyLoaded = true;
+  const main = document.getElementById('lety-main');
+  main.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const items = await api('/api/lety');
+    let html = `<div class="section-title">Lety's Collection <span class="lety-badge">♥</span></div>`;
+    items.forEach(item => {
+      // Build consistent stream URLs by encoding each path segment individually
+      const folderTracks = item.tracks.map(t => {
+        const url = '/stream/lety/' + encPath(t);
+        return { url, title: t.split(/[\\/]/).pop() };
+      });
+      const rid = storeTracklist(folderTracks);
+      html += `<div class="album-block"><div class="album-header">
+        <span class="album-name">📁 ${item.folder ? esc(item.folder) : 'Root'}</span>`;
+      if (item.folder) {
+        html += `<button class="btn btn-all" onclick="playAllById(${rid})">▶ Play All</button>
+          <a class="btn btn-zip" href="/download/zip/lety/${enc(item.folder)}" download>⬇ Download</a>`;
+      }
+      html += `</div>`;
+      item.tracks.forEach(relPath => {
+        const name = relPath.split(/[\\/]/).pop();
+        const streamUrl = '/stream/lety/' + encPath(relPath);
+        const dlUrl     = '/download/lety/' + encPath(relPath);
+        html += `<div class="track-row" data-url="${streamUrl}">
+          <span class="track-name">🎵 ${esc(name)}</span>
+          <button class="btn btn-play" onclick="playMedia('${streamUrl}','${esc(name)}',false)">▶</button>
+          <a class="btn btn-dl" href="${dlUrl}" download>⬇</a>
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    main.innerHTML = html;
+    applyHighlight();
+  } catch(e) { main.innerHTML = '<div class="empty">Failed to load.</div>'; }
+}
+
+/* ══ AUDIOBOOKS ══════════════════════════════════════════════════════════ */
+let booksLoaded = false;
+let bookCategories = [];
+
+async function loadBookCategories() {
+  booksLoaded = true;
+  const nav = document.getElementById('books-nav');
+  nav.innerHTML = '<div class="loading" style="padding:20px">Loading…</div>';
+  try {
+    bookCategories = await api('/api/books/categories');
+    renderBooksNav();
+  } catch(e) { nav.innerHTML = '<div class="empty">Error.</div>'; }
+}
+
+function renderBooksNav() {
+  const nav = document.getElementById('books-nav');
+  nav.innerHTML = bookCategories.map(cat => `
+    <div class="sidebar-section">${esc(cat.display)}</div>
+    <div id="books-sub-${cat.key}">
+      <button class="sidebar-item" onclick="selectBookCategory('${esc(cat.key)}','${esc(cat.type)}',this)">
+        Browse ${esc(cat.display)}
+      </button>
+    </div>`).join('');
+}
+
+function filterBooks(q) {
+  document.querySelectorAll('#books-nav .sidebar-item').forEach(b =>
+    b.style.display = !q || b.textContent.toLowerCase().includes(q) ? '' : 'none'
+  );
+}
+document.getElementById('books-search').addEventListener('input', e => filterBooks(e.target.value.toLowerCase()));
+
+async function selectBookCategory(category, type, btn) {
+  document.querySelectorAll('#books-nav .sidebar-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const main = document.getElementById('books-main');
+  main.innerHTML = '<div class="loading">Loading…</div>';
+  const cat = bookCategories.find(c => c.key === category);
+
+  if (type === 'by_author') {
+    try {
+      const authors = await api(`/api/books/${enc(category)}/authors`);
+      const subDiv = document.getElementById(`books-sub-${category}`);
+      subDiv.innerHTML =
+        `<button class="sidebar-item" onclick="selectBookCategory('${esc(category)}','by_author',this)">Browse ${esc(cat.display)}</button>` +
+        authors.map(a =>
+          `<button class="sidebar-item" style="padding-left:28px;font-size:.83rem;"
+            onclick="loadBooksByAuthor('${esc(category)}','${esc(a)}',this)">${esc(a)}</button>`
+        ).join('');
+      filterBooks(document.getElementById('books-search').value.toLowerCase());
+      main.innerHTML = `<div class="section-title">📚 ${esc(cat.display)}</div>
+        <div class="section-sub">${authors.length} authors — select one from the sidebar</div>`;
+    } catch(e) { main.innerHTML = '<div class="empty">Error.</div>'; }
+  } else {
+    await loadBooksByTitle(category, cat);
+  }
+}
+
+async function loadBooksByAuthor(category, author, btn) {
+  document.querySelectorAll('#books-nav .sidebar-item').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const main = document.getElementById('books-main');
+  main.innerHTML = '<div class="loading">Loading…</div>';
+  const cat = bookCategories.find(c => c.key === category);
+  try {
+    const books = await api(`/api/books/${enc(category)}/author/${enc(author)}`);
+    let html = MOBILE_BACK + `<div class="breadcrumb">
+      <span class="crumb" onclick="selectBookCategory('${esc(category)}','by_author',document.querySelector('#books-sub-${category} .sidebar-item'))">${esc(cat.display)}</span>
+      › <span>${esc(author)}</span></div>
+    <div class="section-title">📖 ${esc(author)}
+      <a class="btn btn-zip" href="/download/zip/books/${enc(category)}/author/${enc(author)}" download>⬇ Download Author</a>
+    </div>`;
+    html += renderBookList(books, category, author);
+    main.innerHTML = html;
+    mobileEnterContent(main);
+    applyHighlight();
+  } catch(e) { main.innerHTML = '<div class="empty">Error.</div>'; }
+}
+
+async function loadBooksByTitle(category, cat) {
+  const main = document.getElementById('books-main');
+  main.innerHTML = '<div class="loading">Loading…</div>';
+  try {
+    const books = await api(`/api/books/${enc(category)}/titles`);
+    let html = MOBILE_BACK + `<div class="section-title">📚 ${esc(cat.display)}
+      <span style="font-size:.8rem;color:var(--muted);font-weight:400;">(${books.length} books)</span></div>`;
+    html += renderBookList(books, category, '_');
+    main.innerHTML = html;
+    mobileEnterContent(main);
+    applyHighlight();
+  } catch(e) { main.innerHTML = '<div class="empty">Error.</div>'; }
+}
+
+function renderBookList(books, category, authorOrPlaceholder) {
+  if (!books.length) return '<div class="empty">No books found.</div>';
+  return books.map(book => {
+    const partTracks = book.parts.map((p, i) => ({
+      url:   `/stream/books/${enc(category)}/${enc(authorOrPlaceholder)}/${enc(book.title)}/${enc(p)}`,
+      title: `${book.title}${book.parts.length > 1 ? ' – Part ' + (i + 1) : ''}`,
+    }));
+    const rid = storeTracklist(partTracks);
+    const partLabel = book.parts.length > 1 ? `<small style="color:var(--muted);font-weight:400;margin-left:8px;">${book.parts.length} parts</small>` : '';
+    return `<div class="track-row" data-url="${partTracks[0]?.url ?? ''}">
+      <span class="track-name">📖 ${esc(book.title)}${partLabel}</span>
+      <button class="btn btn-all" onclick="playAllById(${rid})">▶ Play</button>
+      <a class="btn btn-zip" href="/download/zip/books/${enc(category)}/${enc(authorOrPlaceholder)}/${enc(book.title)}" download>⬇</a>
+    </div>`;
+  }).join('');
+}
+
+// Audiobooks is the default tab — load on startup
+loadBookCategories();
+
+/* ══ SEARCH ══════════════════════════════════════════════════════════════ */
+const searchInput   = document.getElementById('search-input');
+const searchCat     = document.getElementById('search-cat');
+const searchClear   = document.getElementById('search-clear');
+const searchPanel   = document.getElementById('search-results-panel');
+const allTabPanels  = document.querySelectorAll('.tab-panel');
+let searchTimer;
+
+function searchActive() { return searchPanel.classList.contains('active'); }
+
+function openSearch() {
+  allTabPanels.forEach(p => { p._prevDisplay = p.style.display; p.style.display = 'none'; });
+  searchPanel.classList.add('active');
+  searchClear.style.display = 'block';
+}
+
+function closeSearch() {
+  searchPanel.classList.remove('active');
+  searchPanel.innerHTML = '';
+  searchInput.value = '';
+  searchClear.style.display = 'none';
+  // Restore whichever tab was active
+  allTabPanels.forEach(p => {
+    p.style.display = p.classList.contains('active') ? 'flex' : 'none';
+  });
+}
+
+searchClear.addEventListener('click', closeSearch);
+
+searchInput.addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  const q = searchInput.value.trim();
+  if (!q) { closeSearch(); return; }
+  searchTimer = setTimeout(() => runSearch(q), 320);
+});
+
+// Re-run search when category changes while a query is active
+searchCat.addEventListener('change', () => {
+  const q = searchInput.value.trim();
+  if (q) runSearch(q);
+});
+
+async function runSearch(q) {
+  const cat = searchCat.value;
+  openSearch();
+  searchPanel.innerHTML = '<div class="sr-empty">Searching…</div>';
+  try {
+    const results = await api(`/api/search?q=${enc(q)}&category=${enc(cat)}`);
+    renderSearchResults(results, q);
+  } catch(e) {
+    searchPanel.innerHTML = '<div class="sr-empty">Search error.</div>';
+  }
+}
+
+function renderSearchResults(results, q) {
+  if (!results.length) {
+    searchPanel.innerHTML = `<div class="sr-empty">No results for "<strong>${esc(q)}</strong>"</div>`;
+    return;
+  }
+
+  const movies  = results.filter(r => r.type === 'movie');
+  const albums  = results.filter(r => r.type === 'album');
+  const books   = results.filter(r => r.type === 'book');
+  const letyF   = results.filter(r => r.type === 'lety_folder');
+
+  let html = `<div class="sr-count">${results.length} result${results.length !== 1 ? 's' : ''} for "<strong>${esc(q)}</strong>"</div>`;
+
+  if (movies.length) {
+    html += `<div class="sr-section"><div class="sr-section-title">🎬 Movies (${movies.length})</div>`;
+    movies.forEach(r => {
+      const url = `/stream/movie/${enc(r.filename)}`;
+      const dl  = `/download/movie/${enc(r.filename)}`;
+      html += `<div class="sr-item">
+        <span class="sr-icon">🎬</span>
+        <span class="sr-name"><strong>${esc(r.title)}</strong></span>
+        <button class="btn btn-play" onclick="playMedia('${url}','${esc(r.title)}',true)">▶ Play</button>
+        <a class="btn btn-dl" href="${dl}" download>⬇</a>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (albums.length) {
+    html += `<div class="sr-section"><div class="sr-section-title">🎵 Music (${albums.length})</div>`;
+    albums.forEach(r => {
+      const dlUrl = `/download/zip/music/album/${enc(r.artist)}/${enc(r.album)}`;
+      const rid = storeTracklist([]);  // placeholder; filled on click
+      html += `<div class="sr-item">
+        <span class="sr-icon">💿</span>
+        <span class="sr-name"><strong>${esc(r.album)}</strong><small>${esc(r.artist)}</small></span>
+        <button class="btn btn-all" onclick="srPlayAlbum('${esc(r.artist)}','${esc(r.album)}',this)">▶ Play All</button>
+        <a class="btn btn-dl" href="${dlUrl}" download>⬇</a>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (books.length) {
+    html += `<div class="sr-section"><div class="sr-section-title">📚 Audiobooks (${books.length})</div>`;
+    books.forEach(r => {
+      const dlUrl = `/download/zip/books/${enc(r.category)}/${enc(r.author)}/${enc(r.title)}`;
+      html += `<div class="sr-item">
+        <span class="sr-icon">📖</span>
+        <span class="sr-name"><strong>${esc(r.title)}</strong><small>${esc(r.cat_display)}${r.author !== '_' ? ' · ' + esc(r.author) : ''}</small></span>
+        <button class="btn btn-all" onclick="srPlayBook('${esc(r.category)}','${esc(r.cat_type)}','${esc(r.author)}','${esc(r.title)}',this)">▶ Play All</button>
+        <a class="btn btn-dl" href="${dlUrl}" download>⬇</a>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  if (letyF.length) {
+    html += `<div class="sr-section"><div class="sr-section-title">💜 Lety's Collection (${letyF.length})</div>`;
+    letyF.forEach(r => {
+      html += `<div class="sr-item">
+        <span class="sr-icon">📁</span>
+        <span class="sr-name"><strong>${esc(r.folder)}</strong></span>
+        <button class="btn btn-all" onclick="srPlayLety('${esc(r.folder)}',this)">▶ Play All</button>
+        <a class="btn btn-dl" href="/download/zip/lety/${enc(r.folder)}" download>⬇</a>
+      </div>`;
+    });
+    html += `</div>`;
+  }
+
+  searchPanel.innerHTML = html;
+}
+
+// Play helpers that fetch track lists on demand
+async function srPlayAlbum(artist, album, btn) {
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const albums = await api(`/api/music/artist/${enc(artist)}`);
+    const alb = albums.find(a => a.album === album);
+    if (!alb) return;
+    const rid = storeTracklist(alb.tracks.map(t => ({
+      url:   `/stream/music/${enc(artist)}/${enc(album)}/${enc(t)}`,
+      title: `${album} – ${t}`,
+    })));
+    playAllById(rid);
+  } finally { btn.textContent = '▶ Play All'; btn.disabled = false; }
+}
+
+async function srPlayBook(category, catType, author, title, btn) {
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const url = catType === 'by_author'
+      ? `/api/books/${enc(category)}/author/${enc(author)}`
+      : `/api/books/${enc(category)}/titles`;
+    const books = await api(url);
+    const book  = books.find(b => b.title === title);
+    if (!book) return;
+    const rid = storeTracklist(book.parts.map((p, i) => ({
+      url:   `/stream/books/${enc(category)}/${enc(author)}/${enc(title)}/${enc(p)}`,
+      title: `${title}${book.parts.length > 1 ? ' – Part ' + (i+1) : ''}`,
+    })));
+    playAllById(rid);
+  } finally { btn.textContent = '▶ Play All'; btn.disabled = false; }
+}
+
+async function srPlayLety(folder, btn) {
+  btn.textContent = '…'; btn.disabled = true;
+  try {
+    const items = await api('/api/lety');
+    const item  = items.find(i => i.folder === folder);
+    if (!item) return;
+    const rid = storeTracklist(item.tracks.map(t => ({
+      url:   '/stream/lety/' + encPath(t),
+      title: t.split(/[\\/]/).pop(),
+    })));
+    playAllById(rid);
+  } finally { btn.textContent = '▶ Play All'; btn.disabled = false; }
+}
+</script>
+</body>
+</html>
